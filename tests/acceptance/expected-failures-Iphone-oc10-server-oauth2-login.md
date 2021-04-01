@@ -4,4 +4,4 @@
 -   [webUISharingNotifications/shareWithUsers.feature:49](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingNotifications/shareWithUsers.feature#L49)
 -   [webUISharingNotificationsToRoot/shareWithUsers.feature:36](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingNotificationsToRoot/shareWithUsers.feature:#L36)
 -   [webUISharingNotificationsToRoot/shareWithUsers.feature:49](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingNotificationsToRoot/shareWithUsers.feature:#L49)
--   [webUISharingAcceptSharesToRoot/acceptShares.feature:47](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingAcceptSharesToRoot/acceptShares.feature:#L47)
+-   [webUISharingAcceptSharesToRoot/acceptShares.feature:49](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingAcceptSharesToRoot/acceptShares.feature:#L47)
