@@ -9,7 +9,7 @@ Feature: Autocompletion of share-with names
     And the administrator has set the default folder for received shares to "Shares"
     And these users have been created with default attributes and without skeleton files but not initialized:
       | username    |
-      | abcuser |
+      | regularuser |
     And these users have been created without initialization and without skeleton files:
       | username | password  | displayname | email        |
       | two      | %regular% | Brian Murphy    | u2@oc.com.np |
@@ -25,8 +25,8 @@ Feature: Autocompletion of share-with names
     Given these users have been created without initialization and without skeleton files:
       | username   | password  | displayname | email             |
       | <username> | %regular% | SpecialUser | usrmail@oc.com.np |
-    And user "abcuser" has created file "data.zip"
-    And user "abcuser" has logged in using the webUI
+    And user "regularuser" has created file "data.zip"
+    And user "regularuser" has logged in using the webUI
     And the user has browsed to the files page
     And the user has opened the share dialog for file "data.zip"
     And the user opens the share creation dialog in the webUI

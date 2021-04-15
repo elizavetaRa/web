@@ -197,6 +197,7 @@ Other free text and markdown formatting can be used elsewhere in the document if
 ### [Cannot create users with special characters](https://github.com/owncloud/ocis/issues/1417)
 -   [webUISharingAutocompletion/shareAutocompletionSpecialChars.feature:37](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingAutocompletion/shareAutocompletionSpecialChars.feature#L37)
 -   [webUISharingAutocompletion/shareAutocompletionSpecialChars.feature:38](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingAutocompletion/shareAutocompletionSpecialChars.feature#L38)
+-   [webUISharingAutocompletion/shareAutocompletionSpecialChars.feature:39](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingAutocompletion/shareAutocompletionSpecialChars.feature#L39)
 -   [webUISharingAutocompletion/shareAutocompletionSpecialChars.feature:40](https://github.com/owncloud/web/blob/master/tests/acceptance/features/webUISharingAutocompletion/shareAutocompletionSpecialChars.feature#L40)
 
 ### [No occ command in ocis](https://github.com/owncloud/ocis/issues/1317)
