@@ -13,7 +13,7 @@ Feature: Versions of a file
 
   Scenario: upload new file with same name to see if different versions are shown
     Given user "user0" has logged in using the webUI
-    And user "user0" has uploaded file "lorem.txt" to "lorem.txt"
+    And user "user0" has uploaded file with content "original lorem content" to "lorem.txt"
     And the user has browsed to the files page
     And user "user0" has uploaded file with content "lorem content" to "lorem.txt"
     And user "user0" has uploaded file with content "new lorem content" to "lorem.txt"
