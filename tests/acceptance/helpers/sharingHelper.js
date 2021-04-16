@@ -115,6 +115,7 @@ module.exports = {
           'Could not get shares. Message: ' + sharesResult.ocs.meta.message
         )
         const shares = sharesResult.ocs.data
+        console.log(shares)
         let found
         for (const share of shares) {
           found = true
