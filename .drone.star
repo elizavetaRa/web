@@ -1028,6 +1028,8 @@ def installCore(version, db):
 	host = getDbName(db)
 	dbType = host
 
+	commitID = $CORE_COMMITID
+
 	username = getDbUsername(db)
 	password = getDbPassword(db)
 	database = getDbDatabase(db)
@@ -1046,7 +1048,7 @@ def installCore(version, db):
 		'image': 'owncloudci/core',
 		'pull': 'always',
 		'settings': {
-			'version': version,
+			'git_reference': commitID,
 			'core_path': '/var/www/owncloud/server',
 			'db_type': dbType,
 			'db_name': database,
