@@ -410,7 +410,7 @@ def main(ctx):
     after = afterPipelines(ctx)
     dependsOn(stages, after)
 
-    return before + stages + after
+    return before + stages + after + checkStarlark()
 
 def beforePipelines(ctx):
     return yarnlint() + changelog(ctx) + website(ctx)
@@ -1997,6 +1997,28 @@ def githubComment():
             ],
             "event": [
                 "pull_request",
+            ],
+        },
+    }]
+
+def checkStarlark():
+    return [{
+        "kind": "pipeline",
+        "type": "docker",
+        "name": "check-starlark",
+        "steps": [{
+            "name": "lint-starlark",
+            "image": "owncloudci/golang:1.16",
+            "pull": "always",
+            "commands": [
+                "go install github.com/bazelbuild/buildtools/buildifier@latest",
+                "buildifier /drone/src/.drone.star",
+            ],
+        }],
+        "depends_on": [],
+        "trigger": {
+            "ref": [
+                "refs/pull/**",
             ],
         },
     }]
