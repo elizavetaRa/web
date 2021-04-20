@@ -719,7 +719,7 @@ def acceptance(ctx):
 							services += databaseService(db) + owncloudService()
 
 							## prepare oc10 server
-							steps += installCore(server, db) + owncloudLog() + setupServerAndApp(params['logLevel'])
+							steps += installCore(db) + owncloudLog() + setupServerAndApp(params['logLevel'])
 
 							if (params['openIdConnect']):
 								## Configure oc10 and web with openidConnect login
@@ -1024,11 +1024,10 @@ def getSaucelabsBrowserName(browser):
 def isLocalBrowser(browser):
 	return ((browser == 'chrome') or (browser == 'firefox'))
 
-def installCore(version, db):
+
+def installCore(db):
 	host = getDbName(db)
 	dbType = host
-
-	commitID = $CORE_COMMITID
 
 	username = getDbUsername(db)
 	password = getDbPassword(db)
@@ -1048,14 +1047,20 @@ def installCore(version, db):
 		'image': 'owncloudci/core',
 		'pull': 'always',
 		'settings': {
-			'git_reference': commitID,
 			'core_path': '/var/www/owncloud/server',
 			'db_type': dbType,
 			'db_name': database,
 			'db_host': host,
 			'db_username': username,
 			'db_password': password
-		}
+		},
+		'commands': [
+			'source /var/www/owncloud/web/.drone.env',
+			'export PLUGIN_GIT_REPOSITORY=$CORE_COMMITID',
+			'bash /usr/sbin/plugin.sh'
+		]
+
+
 	}
 
 	return [stepDefinition]
