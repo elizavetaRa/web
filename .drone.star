@@ -1122,6 +1122,7 @@ def buildWeb():
 		'image': 'owncloudci/nodejs:12',
 		'pull': 'always',
 		'commands': [
+			'pwd',
 			'yarn build',
 			'cp tests/drone/config-oc10-oauth.json dist/config.json',
 			'mkdir -p /srv/config',
