@@ -325,19 +325,19 @@ config = {
 }
 
 def main(ctx):
-	before = beforePipelines(ctx)
+	# before = beforePipelines(ctx)
 
 	stages = stagePipelines(ctx)
 	if (stages == False):
 		print('Errors detected. Review messages above.')
 		return []
 
-	dependsOn(before, stages)
+	# dependsOn(before, stages)
 
-	after = afterPipelines(ctx)
-	dependsOn(stages, after)
+	# after = afterPipelines(ctx)
+	# dependsOn(stages, after)
 
-	return before + stages + after
+	return stages
 
 def beforePipelines(ctx):
 	return yarnlint() + changelog(ctx) + website(ctx)
@@ -978,9 +978,13 @@ def installCore(db):
 			'db_password': password
 		},
 		'commands': [
+			'pwd',
+			'echo $CORE_COMMITID',
 			'. /var/www/owncloud/web/.drone.env',
+			'echo $CORE_COMMITID',
 			'export PLUGIN_GIT_REPOSITORY=$CORE_COMMITID',
-			'bash usr/sbin/plugin.sh'
+			'echo $PLUGIN_GIT_REPOSITORY',
+			'ls',
 		]
 
 
