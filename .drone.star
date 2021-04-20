@@ -1055,9 +1055,9 @@ def installCore(db):
 			'db_password': password
 		},
 		'commands': [
-			'source /var/www/owncloud/web/.drone.env',
+			'. /var/www/owncloud/web/.drone.env',
 			'export PLUGIN_GIT_REPOSITORY=$CORE_COMMITID',
-			'bash /usr/sbin/plugin.sh'
+			'. /usr/sbin/plugin.sh'
 		]
 
 
