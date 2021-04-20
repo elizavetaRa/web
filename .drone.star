@@ -1993,7 +1993,7 @@ def githubComment():
         },
         "when": {
             "status": [
-                "failure",
+            "failure",
             ],
             "event": [
                 "pull_request",
@@ -2006,15 +2006,32 @@ def checkStarlark():
         "kind": "pipeline",
         "type": "docker",
         "name": "check-starlark",
-        "steps": [{
-            "name": "lint-starlark",
-            "image": "owncloudci/golang:1.16",
-            "pull": "always",
-            "commands": [
-                "go install github.com/bazelbuild/buildtools/buildifier@latest",
-                "buildifier /drone/src/.drone.star",
-            ],
-        }],
+        "steps": [
+            {
+                "name": "format-check-starlark",
+                "image": "owncloudci/golang:1.16",
+                "pull": "always",
+                "commands": [
+                    "go install github.com/bazelbuild/buildtools/buildifier@latest",
+                    "buildifier --mode=check /drone/src/.drone.star",
+                ],
+            },
+            {
+                "name": "show-diff",
+                "image": "owncloudci/golang:1.16",
+                "pull": "always",
+                "commands": [
+                    "go install github.com/bazelbuild/buildtools/buildifier@latest",
+                    "buildifier --mode=fix /drone/src/.drone.star",
+                    "cd /drone/src/ && git diff",
+                ],
+                "when": {
+                    "status": [
+                        "failure",
+                    ],
+                },
+            },
+        ],
         "depends_on": [],
         "trigger": {
             "ref": [
