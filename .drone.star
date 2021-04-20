@@ -1057,7 +1057,7 @@ def installCore(db):
 		'commands': [
 			'. /var/www/owncloud/web/.drone.env',
 			'export PLUGIN_GIT_REPOSITORY=$CORE_COMMITID',
-			'. /usr/sbin/plugin.sh'
+			'ls -la'
 		]
 
 
