@@ -1993,7 +1993,7 @@ def githubComment():
         },
         "when": {
             "status": [
-            "failure",
+                "failure",
             ],
             "event": [
                 "pull_request",
