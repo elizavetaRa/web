@@ -546,18 +546,27 @@ def main(ctx):
     after = afterPipelines(ctx)
     dependsOn(stages, after)
 
-    return before + stages + after + checkStarlark()
+    if ctx.build.event == "cron":
+        return example_deploys(ctx)
+
+    pipelines = before + stages + after
+
+    deploys = example_deploys(ctx)
+    dependsOn(pipelines, deploys)
+
+    return pipelines + deploys + checkStarlark()
+
+    return pipelines
 
 def beforePipelines(ctx):
-    return yarnlint() + changelog(ctx) + website(ctx)
+    return yarnlint() + changelog(ctx) + website(ctx) + cacheOcisPipeline(ctx)
 
 def stagePipelines(ctx):
     acceptancePipelines = acceptance(ctx)
     if acceptancePipelines == False:
         return unitTests()
 
-    cachePipelines = cacheOcisPipeline(ctx)
-    return unitTests() + cachePipelines + acceptancePipelines
+    return unitTests() + acceptancePipelines
 
 def afterPipelines(ctx):
     return build(ctx) + notify()
@@ -1115,6 +1124,7 @@ def owncloudService():
         "pull": "always",
         "environment": {
             "APACHE_WEBROOT": "/var/www/owncloud/server/",
+            "APACHE_LOGGING_PATH": "/dev/null",
         },
         "command": [
             "/usr/local/bin/apachectl",
@@ -1130,6 +1140,7 @@ def owncloudFederatedService():
         "pull": "always",
         "environment": {
             "APACHE_WEBROOT": "/var/www/owncloud/federated/",
+            "APACHE_LOGGING_PATH": "/dev/null",
         },
         "command": [
             "/usr/local/bin/apachectl",
@@ -1536,9 +1547,10 @@ def webService():
         "pull": "always",
         "environment": {
             "APACHE_WEBROOT": "/var/www/owncloud/web/dist",
+            "APACHE_LOGGING_PATH": "/dev/null",
         },
         "commands": [
-            "mkdir dist",
+            "mkdir -p /var/www/owncloud/web/dist",
             "/usr/local/bin/apachectl -D FOREGROUND",
         ],
     }]
@@ -2258,6 +2270,81 @@ def githubComment():
         },
     }]
 
+def example_deploys(ctx):
+    latest_configs = [
+        "ocis_web/latest.yml",
+    ]
+    released_configs = []
+
+    # if on master branch:
+    configs = latest_configs
+    rebuild = "false"
+
+    if ctx.build.event == "tag":
+        configs = released_configs
+        rebuild = "false"
+
+    if ctx.build.event == "cron":
+        configs = latest_configs + released_configs
+        rebuild = "true"
+
+    deploys = []
+    for config in configs:
+        deploys.append(deploy(ctx, config, rebuild))
+
+    return deploys
+
+def deploy(ctx, config, rebuild):
+    return {
+        "kind": "pipeline",
+        "type": "docker",
+        "name": "deploy_%s" % (config),
+        "platform": {
+            "os": "linux",
+            "arch": "amd64",
+        },
+        "steps": [
+            {
+                "name": "clone continuous deployment playbook",
+                "image": "alpine/git:latest",
+                "commands": [
+                    "cd deployments/continuous-deployment-config",
+                    "git clone https://github.com/owncloud-devops/continuous-deployment.git",
+                ],
+            },
+            {
+                "name": "deploy",
+                "image": "owncloudci/drone-ansible:latest",
+                "failure": "ignore",
+                "environment": {
+                    "CONTINUOUS_DEPLOY_SERVERS_CONFIG": "../%s" % (config),
+                    "REBUILD": "%s" % (rebuild),
+                    "HCLOUD_API_TOKEN": {
+                        "from_secret": "hcloud_api_token",
+                    },
+                    "CLOUDFLARE_API_TOKEN": {
+                        "from_secret": "cloudflare_api_token",
+                    },
+                },
+                "settings": {
+                    "playbook": "deployments/continuous-deployment-config/continuous-deployment/playbook-all.yml",
+                    "galaxy": "deployments/continuous-deployment-config/continuous-deployment/requirements.yml",
+                    "requirements": "deployments/continuous-deployment-config/continuous-deployment/py-requirements.txt",
+                    "inventory": "localhost",
+                    "private_key": {
+                        "from_secret": "ssh_private_key",
+                    },
+                },
+            },
+        ],
+        "trigger": {
+            "ref": [
+                "refs/heads/master",
+                "refs/tags/v*",
+            ],
+        },
+    }
+
 def checkStarlark():
     return [{
         "kind": "pipeline",
@@ -2298,4 +2385,7 @@ def checkStarlark():
 def dependsOn(earlierStages, nextStages):
     for earlierStage in earlierStages:
         for nextStage in nextStages:
-            nextStage["depends_on"].append(earlierStage["name"])
+            if "depends_on" in nextStage.keys():
+                nextStage["depends_on"].append(earlierStage["name"])
+            else:
+                nextStage["depends_on"] = [earlierStage["name"]]

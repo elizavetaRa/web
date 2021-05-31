@@ -122,12 +122,18 @@ module.exports = {
      *
      * @returns {exports}
      */
-    savePublicLink: function() {
-      return this.waitForElementVisible('@publicLinkSaveButton')
+    savePublicLink: async function() {
+      await this.waitForElementVisible('@publicLinkSaveButton')
         .initAjaxCounters()
         .click('@publicLinkSaveButton')
-        .waitForElementNotPresent({ selector: '@publicLinkSaveButton', abortOnFailure: false })
-        .waitForOutstandingAjaxCalls()
+      try {
+        await this.waitForElementNotPresent({
+          selector: '@publicLinkSaveButton'
+        }).waitForOutstandingAjaxCalls()
+      } catch (e) {
+        throw new Error('ElementPresentError')
+      }
+      return this
     },
     /**
      * deletes existing public link share
@@ -146,6 +152,9 @@ module.exports = {
       return this.waitForElementVisible(linkRowDeleteButton)
         .initAjaxCounters()
         .click(linkRowDeleteButton)
+        .waitForElementVisible('@dialog')
+        .waitForAnimationToFinish()
+        .click('@dialogConfirmBtn')
         .waitForAnimationToFinish()
         .waitForOutstandingAjaxCalls()
     },
@@ -442,6 +451,12 @@ module.exports = {
     publicLinkRoleSelectionDropdown: {
       selector: '//button[contains(@class, "files-file-link-role-button")]//span[.="%s"]',
       locateStrategy: 'xpath'
+    },
+    dialog: {
+      selector: '.oc-modal'
+    },
+    dialogConfirmBtn: {
+      selector: '.oc-modal-body-actions-confirm'
     }
   }
 }

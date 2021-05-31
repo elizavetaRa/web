@@ -108,6 +108,10 @@ export default {
       } else {
         return 100
       }
+    },
+
+    uploadPending() {
+      return this.totalUploadProgress < 100
     }
   },
   watch: {
@@ -124,10 +128,20 @@ export default {
         this.delayForScreenreader(() => this.$refs.progressbar.$el.focus())
       })
     })
+    window.addEventListener('beforeunload', this.confirmUnload)
+  },
+  beforeDestroy() {
+    window.removeEventListener('beforeunload', this.confirmUnload)
   },
   methods: {
     $_toggleExpanded() {
       this.expanded = !this.expanded
+    },
+    confirmUnload(event) {
+      if (this.uploadPending) {
+        event.preventDefault()
+        event.returnValue = ''
+      }
     }
   }
 }

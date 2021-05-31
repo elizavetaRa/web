@@ -10,6 +10,10 @@ Summary
 
 * Bugfix - Correct navigation through "via"-tags: [#5122](https://github.com/owncloud/web/pull/5122)
 * Bugfix - Correct sharee tag: [#5112](https://github.com/owncloud/web/pull/5112)
+* Enhancement - Continuously deployed demo instance with latest Web: [#5145](https://github.com/owncloud/web/pull/5145)
+* Enhancement - Confirmation for public link deletion: [#5125](https://github.com/owncloud/web/pull/5125)
+* Enhancement - Configure previews: [#5159](https://github.com/owncloud/web/pull/5159)
+* Enhancement - Prompts leaving user about pending uploads: [#2590](https://github.com/owncloud/web/issues/2590)
 
 Details
 -------
@@ -29,6 +33,38 @@ Details
    correct tag (e.g. "Viewer", "Editor" etc) in the sidebar.
 
    https://github.com/owncloud/web/pull/5112
+
+* Enhancement - Continuously deployed demo instance with latest Web: [#5145](https://github.com/owncloud/web/pull/5145)
+
+   Whenever a commit or merge to master happens, a demo instance with the latest Web build will be
+   deployed.
+
+   https://github.com/owncloud/web/pull/5145
+
+* Enhancement - Confirmation for public link deletion: [#5125](https://github.com/owncloud/web/pull/5125)
+
+   The deletion of public links is an irreversible interaction and should be handled with more
+   care since users might have bookmarked or shared with other people. We have added a
+   confirmation modal now to prevent users from accidentally deleting public links.
+
+   https://github.com/owncloud/web/pull/5125
+
+* Enhancement - Configure previews: [#5159](https://github.com/owncloud/web/pull/5159)
+
+   We introduced a new config option to configure which file will be previewed. To do so, add
+   `"options.previewFileExtensions": ["jpg", "txt"]` in the config.json file.
+
+   https://github.com/owncloud/web/issues/5079
+   https://github.com/owncloud/web/pull/5159
+
+* Enhancement - Prompts leaving user about pending uploads: [#2590](https://github.com/owncloud/web/issues/2590)
+
+   Added an unload event listener that detects closes/ reloads/ navigates to another URL. Added
+   prompt that ask for confirmation to leave site on unload events if uploads pending. Removed the
+   event listener before destroy of component.
+
+   https://github.com/owncloud/web/issues/2590
+   https://github.com/owncloud/web/pull/4840
 
 Changelog for ownCloud Web [3.1.0] (2021-05-12)
 =======================================
