@@ -12,6 +12,12 @@
     "@ownclouders/web-client": "workspace:*",
     "@ownclouders/web-pkg": "workspace:*",
     "@vueuse/core": "^10.3.0",
-    "vue3-gettext": "2.4.0"
+    "vue3-gettext": "2.4.0",
+    "vue-concurrency": "4.0.1",
+    "vuex": "4.1.0",
+    "pinia": "2.1.7"
+  },
+  "dependencies": {
+    "vue-advanced-cropper": "^2.8.8"
   }
 }

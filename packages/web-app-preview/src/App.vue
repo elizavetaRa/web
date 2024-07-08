@@ -1,49 +1,60 @@
 <template>
-  <div v-if="loading" class="oc-width-1-1">
-    <div class="oc-position-center">
-      <oc-spinner :aria-label="$gettext('Loading media file')" size="xlarge" />
-    </div>
-  </div>
-  <oc-icon
-    v-else-if="isFileContentError"
-    name="file-damage"
-    variation="danger"
-    size="xlarge"
-    class="oc-position-center"
-    :accessible-label="$gettext('Failed to load media file')"
-  />
-  <div
-    v-else
-    ref="preview"
-    class="oc-flex oc-width-1-1 oc-height-1-1"
-    tabindex="-1"
-    @keydown.left="prev"
-    @keydown.right="next"
-  >
-    <div class="stage" :class="{ lightbox: isFullScreenModeActivated }">
-      <div v-show="activeMediaFileCached" class="stage_media">
-        <media-image
-          v-if="activeMediaFileCached.isImage"
-          :file="activeMediaFileCached"
-          :current-image-rotation="currentImageRotation"
-          :current-image-zoom="currentImageZoom"
-          :current-image-position-x="currentImagePositionX"
-          :current-image-position-y="currentImagePositionY"
-          @pan-zoom-change="onPanZoomChanged"
-        />
-        <media-video
-          v-else-if="activeMediaFileCached.isVideo"
-          :file="activeMediaFileCached"
-          :is-auto-play-enabled="isAutoPlayEnabled"
-        />
-        <media-audio
-          v-else-if="activeMediaFileCached.isAudio"
-          :file="activeMediaFileCached"
-          :resource="activeFilteredFile"
-          :is-auto-play-enabled="isAutoPlayEnabled"
-        />
+  <div class="preview-body">
+    <media-settings
+      v-if="activeMediaFileCached.isImage && isEditModeActivated"
+      :aria-label="$gettext('Media settings')"
+      @change-processing-tool="handleChangeProcessingTool"
+      @download="triggerActiveFileDownload"
+      @save-cropped-image="save"
+      @rotate-image="currentImageRotation += $event"
+    />
+    <div class="oc-width-1-1">
+      <div v-if="loading" class="oc-width-1-1">
+        <div class="oc-position-center">
+          <oc-spinner :aria-label="$gettext('Loading media file')" size="xlarge" />
+        </div>
       </div>
-      <media-controls
+      <oc-icon
+        v-else-if="isFileContentError"
+        name="file-damage"
+        variation="danger"
+        size="xlarge"
+        class="oc-position-center"
+        :accessible-label="$gettext('Failed to load media file')"
+      />
+      <div
+        v-else
+        ref="preview"
+        class="oc-flex oc-width-1-1 oc-height-1-1"
+        tabindex="-1"
+        @keydown.left="handleSetActiveMediaFile(activeIndex - 1)"
+        @keydown.right="handleSetActiveMediaFile(activeIndex + 1)"
+        @keydown.esc="closePreview"
+      >
+        <div class="stage" :class="{ lightbox: isFullScreenModeActivated }">
+          <div v-show="activeMediaFileCached" class="stage_media">
+            <media-image
+              v-if="activeMediaFileCached.isImage"
+              :file="activeMediaFileCached"
+              :current-image-rotation="currentImageRotation"
+              :current-image-zoom="currentImageZoom"
+              :current-image-position-x="currentImagePositionX"
+              :current-image-position-y="currentImagePositionY"
+              @pan-zoom-change="onPanZoomChanged"
+            />
+            <media-video
+              v-else-if="activeMediaFileCached.isVideo"
+              :file="activeMediaFileCached"
+              :is-auto-play-enabled="isAutoPlayEnabled"
+            />
+            <media-audio
+              v-else-if="activeMediaFileCached.isAudio"
+              :file="activeMediaFileCached"
+              :resource="activeFilteredFile"
+              :is-auto-play-enabled="isAutoPlayEnabled"
+            />
+          </div>
+          <!-- <media-controls
         class="stage_controls"
         :files="filteredFiles"
         :active-index="activeIndex"
@@ -58,10 +69,38 @@
         @toggle-full-screen="toggleFullscreenMode"
         @toggle-previous="prev"
         @toggle-next="next"
-      />
+      /> -->
+
+          <media-controls
+            class="stage_controls"
+            :files="filteredFiles"
+            :active-index="activeIndex"
+            :is-full-screen-mode-activated="isFullScreenModeActivated"
+            :is-edit-mode-activated="isEditModeActivated"
+            :is-folder-loading="isFolderLoading"
+            :is-image="activeMediaFileCached.isImage"
+            :current-image-zoom="currentImageZoom"
+            @set-zoom="currentImageZoom = $event"
+            @toggle-full-screen="toggleFullscreenMode"
+            @toggle-edit-mode="toggleEditMode"
+            @toggle-previous="prev"
+            @toggle-next="next"
+          />
+        </div>
+        <quick-commands
+          :aria-label="$gettext('Quick commands')"
+          :current-image-zoom="currentImageZoom"
+          :is-image="activeMediaFileCached.isImage"
+          :is-saveable="isSaveable"
+          @download="triggerActiveFileDownload"
+          @close="closePreview"
+          @save="save"
+        />
+      </div>
     </div>
   </div>
 </template>
+
 <script lang="ts">
 import {
   computed,
@@ -82,23 +121,56 @@ import {
   FileContext,
   ProcessorType,
   SortDir,
-  useAppsStore,
   queryItemAsString,
+  usePreviewService,
   sortHelper,
   useRoute,
   useRouteQuery,
-  useRouter
+  useRouter,
+  useModals,
+  useDownloadFile
 } from '@ownclouders/web-pkg'
+
 import { createFileRouteOptions } from '@ownclouders/web-pkg'
 import MediaControls from './components/MediaControls.vue'
 import MediaAudio from './components/Sources/MediaAudio.vue'
 import MediaImage from './components/Sources/MediaImage.vue'
 import MediaVideo from './components/Sources/MediaVideo.vue'
-import { CachedFile } from './helpers/types'
 import { getMimeTypes } from './mimeTypes'
 import { PanzoomEventDetail } from '@panzoom/panzoom'
+import { Action, ActionOptions } from '@ownclouders/web-pkg/composables/actions/types'
+import { useTask } from 'vue-concurrency'
+import MediaSettings from './components/MediaSettings.vue'
+import QuickCommands from './components/QuickCommands.vue'
+import { CachedFile, AdjustmentParametersCategoryType } from './helpers/types'
+import applyAdjustmentParams from './composables/saveFunctions/applyAdjustmentParams'
+import { mapActions, mapGetters } from 'vuex'
+import { useGettext } from 'vue3-gettext'
+import { isProjectSpaceResource } from 'web-client'
+import { DavProperty } from 'web-client'
+import { CropVariantEnum, ProcessingToolsEnum } from './helpers'
+import applyCropping from './composables/saveFunctions/applyCropping'
+import { useImageEditorStore } from './piniaStores/imageEditorStore'
 
 export const appId = 'preview'
+
+//ToDo: change this to automatic
+export const mimeTypes = () => {
+  return [
+    'audio/flac',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/wav',
+    'audio/x-flac',
+    'audio/x-wav',
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'video/mp4',
+    'video/webm'
+    //...((window as any).__$store?.getters.extensionConfigByAppId(appId).mimeTypes || [])
+  ]
+}
 
 export default defineComponent({
   name: 'Preview',
@@ -106,7 +178,9 @@ export default defineComponent({
     MediaControls,
     MediaAudio,
     MediaImage,
-    MediaVideo
+    MediaVideo,
+    MediaSettings,
+    QuickCommands
   },
   props: {
     activeFiles: { type: Object as PropType<Resource[]>, required: true },
@@ -121,15 +195,21 @@ export default defineComponent({
     },
     revokeUrl: { type: Function as PropType<AppFileHandlingResult['revokeUrl']>, required: true },
     isFolderLoading: { type: Boolean, required: true }
+    //getFileContens,putFileContents, getFileInfo needed
   },
   emits: ['update:resource'],
   setup(props, { emit }) {
     const router = useRouter()
     const route = useRoute()
-    const appsStore = useAppsStore()
+    const { dispatchModal, removeModal } = useModals()
+    const { downloadFile } = useDownloadFile()
+    const store = useImageEditorStore()
     const contextRouteQuery = useRouteQuery('contextRouteQuery') as unknown as Ref<
       Record<string, string>
     >
+
+    const resource: Ref<Resource> = ref()
+    const appliedAdjustmentParameters = ref<AdjustmentParametersCategoryType[]>()
 
     const activeIndex = ref<number>()
     const cachedFiles = ref<CachedFile[]>([])
@@ -143,10 +223,33 @@ export default defineComponent({
     const currentImagePositionY = ref(0)
     const preloadImageCount = ref(10)
     const preview = ref<HTMLElement>()
+    const previewService = usePreviewService()
 
     const mimeTypes = computed(() => {
-      return getMimeTypes(appsStore.externalAppConfig[appId]?.mimeTypes)
+      // return getMimeTypes(store.externalAppConfig[appId]?.mimeTypes)
+      return [
+        'audio/flac',
+        'audio/mpeg',
+        'audio/ogg',
+        'audio/wav',
+        'audio/x-flac',
+        'audio/x-wav',
+        'image/gif',
+        'image/jpeg',
+        'image/png',
+        'video/mp4',
+        'video/webm'
+        //...((window as any).__$store?.getters.extensionConfigByAppId(appId).mimeTypes || [])
+      ]
     })
+
+    //const store = useAppsStore()
+    const currentETag = ref()
+    const serverVersion = ref()
+
+    const { $gettext, interpolate: $gettextInterpolate } = useGettext()
+    const processingTool = computed(() => store.getSelectedProcessingTool)
+    const activeAdjustmentParameters = computed(() => store.allParameters)
 
     const sortBy = computed(() => {
       if (!unref(contextRouteQuery)) {
@@ -226,6 +329,534 @@ export default defineComponent({
     const isFileContentLoading = ref(true)
 
     const instance = getCurrentInstance()
+
+    /////// here image editing functions
+    const isSaveable = computed(
+      () =>
+        unref(appliedAdjustmentParameters) !== unref(activeAdjustmentParameters) ||
+        unref(processingTool) === ProcessingToolsEnum.Crop ||
+        unref(currentImageRotation) !== 0
+    )
+
+    const errorPopup = (error) => {
+      // store.dispatch('showMessage', {
+      //   title: $gettext('An error occurred'),
+      //   desc: error,
+      //   status: 'danger'
+      // })
+    }
+
+    const imageSavedPopup = () => {
+      // store.dispatch('showMessage', {
+      //   title: $gettext('Image is saved')
+      // })
+    }
+
+    // async function getMediaFileUrl(file: Resource) {
+    //   try {
+    //     const loadRawFile = isFileTypeImage(file)
+    //     let mediaUrl: string
+    //     if (loadRawFile) {
+    //       mediaUrl = await props.getUrlForResource(
+    //         unref(unref(props.currentFileContext).space),
+    //         file
+    //       )
+    //     } else {
+    //       mediaUrl = await loadPreview(file)
+    //     }
+    //     return mediaUrl
+    //   } catch (e) {
+    //     console.error(e)
+    //   }
+    // }
+
+    function isFileTypeImage(file: Resource) {
+      return !isFileTypeAudio(file) && !isFileTypeVideo(file)
+    }
+    function isFileTypeAudio(file: Resource) {
+      return file.mimeType.toLowerCase().startsWith('audio')
+    }
+    function isFileTypeVideo(file: Resource) {
+      return file.mimeType.toLowerCase().startsWith('video')
+    }
+
+    const isActiveFileTypeAudio = computed(() => isFileTypeAudio(activeFilteredFile.value))
+    const isActiveFileTypeVideo = computed(() => isFileTypeVideo(activeFilteredFile.value))
+    const isActiveFileTypeImage = computed(() => isFileTypeImage(activeFilteredFile.value))
+
+    function closePreview() {
+      if (unref(isSaveable) && unref(processingTool) !== ProcessingToolsEnum.Crop) {
+        const modal = {
+          variation: 'danger',
+          icon: 'warning',
+          title: $gettext('Unsaved changes'),
+          message: $gettext('Your changes were not saved. Do you want to save them?'),
+          cancelText: $gettext('Cancel'),
+          buttonSecondaryText: $gettext('Dismiss changes'),
+          confirmText: $gettext('Save'),
+          // onCancel: () => {
+          //   removeModal
+          // },
+          onConfirmSecondary: () => {
+            store.dispatch('hideModal')
+            handleResetValues()
+            closeApp()
+          },
+          onConfirm: async () => {
+            store.dispatch('hideModal')
+            await saveImageTask(false).perform()
+            handleResetValues()
+            closeApp()
+          }
+        }
+        dispatchModal(modal)
+      } else {
+        handleResetValues()
+        closeApp()
+      }
+    }
+
+    function handleResetValues() {
+      store.resetAdjustmentParameters()
+      store.resetSelectedProcessingTool()
+    }
+
+    function handleSetNewActiveIndex(newActiveIndex: number) {
+      isFileContentLoading.value = true
+      if (newActiveIndex >= unref(filteredFiles).length) {
+        activeIndex.value = 0
+      } else if (newActiveIndex < 0) {
+        activeIndex.value = unref(filteredFiles).length - 1
+      } else {
+        activeIndex.value = newActiveIndex
+      }
+      isFileContentLoading.value = false
+    }
+
+    function handleSetActiveMediaFile(newActiveIndex: number) {
+      if (unref(isFileContentLoading)) {
+        return
+      }
+
+      isFileContentError.value = false
+
+      if (unref(isSaveable) && unref(processingTool) !== ProcessingToolsEnum.Crop) {
+        const modal = {
+          variation: 'danger',
+          icon: 'warning',
+          title: $gettext('Unsaved changes'),
+          message: $gettext('Your changes were not saved. Do you want to save them?'),
+          cancelText: $gettext('Cancel'),
+          buttonSecondaryText: $gettext('Dismiss changes'),
+          confirmText: $gettext('Save'),
+          onCancel: () => {
+            store.dispatch('hideModal')
+          },
+          onConfirmSecondary: () => {
+            store.dispatch('hideModal')
+            handleSetNewActiveIndex(newActiveIndex)
+            updateLocalHistory()
+          },
+          onConfirm: async () => {
+            store.dispatch('hideModal')
+            await saveImageTask(false).perform()
+            handleSetActiveMediaFile(newActiveIndex)
+            updateLocalHistory()
+          }
+        }
+        store.dispatch('createModal', modal)
+      } else {
+        handleSetNewActiveIndex(newActiveIndex)
+        updateLocalHistory()
+      }
+    }
+
+    const fileActions: Action<ActionOptions>[] = [
+      {
+        name: 'download-file',
+        isEnabled: () => true,
+        componentType: 'button',
+        icon: 'file-download',
+        id: 'preview-download',
+        label: () => 'Download',
+        handler: () => {
+          triggerActiveFileDownload()
+        }
+      }
+    ]
+
+    const triggerActiveFileDownload = () => {
+      if (isFileContentLoading.value) {
+        return
+      }
+
+      if (unref(activeAdjustmentParameters) !== unref(appliedAdjustmentParameters)) {
+        const modal = {
+          variation: 'danger',
+          icon: 'warning',
+          title: $gettext('Unsaved changes'),
+          message: $gettext(
+            'Your changes were not saved. Do you want to save them before downloading?'
+          ),
+          cancelText: $gettext('Cancel'),
+          buttonSecondaryText: $gettext('Dismiss changes'),
+          confirmText: $gettext('Save and download'),
+          onCancel: () => {
+            store.dispatch('hideModal')
+          },
+          onConfirmSecondary: () => {
+            store.dispatch('hideModal')
+            downloadFile(props.currentFileContext.space, unref(activeFilteredFile))
+            handleResetAfterSave()
+          },
+          onConfirm: async () => {
+            store.dispatch('hideModal')
+            await saveImageTask(false).perform()
+            handleResetAfterSave()
+          }
+        }
+        dispatchModal(modal)
+      } else {
+        downloadFile(props.currentFileContext.space, unref(activeFilteredFile))
+      }
+    }
+
+    const isEditModeActivated = ref(false)
+    const toggleEditMode = () => {
+      const activateEditMode = !unref(isEditModeActivated)
+      isEditModeActivated.value = activateEditMode
+      // if (activateEditMode) {
+      //   if (document.documentElement.requestFullscreen) {
+      //     document.documentElement.requestFullscreen()
+      //   }
+      // } else {
+      //   if (document.exitFullscreen) {
+      //     document.exitFullscreen()
+      //   }
+      // }
+    }
+
+    function handleChangeProcessingTool(newTool: ProcessingToolsEnum) {
+      if (
+        unref(isSaveable) &&
+        newTool === ProcessingToolsEnum.Crop &&
+        unref(processingTool) !== ProcessingToolsEnum.Crop
+      ) {
+        const modal = {
+          variation: 'danger',
+          icon: 'warning',
+          title: $gettext('Unsaved changes'),
+          message: $gettext('Your changes were not saved. Do you want to save the them?'),
+          cancelText: $gettext('Cancel'),
+          buttonSecondaryText: $gettext('Dismiss changes'),
+          confirmText: $gettext('Save'),
+          onCancel: () => {
+            store.dispatch('hideModal')
+          },
+          onConfirmSecondary: () => {
+            store.dispatch('hideModal')
+            store.changeSelectedProcessingTool(newTool)
+            store.resetAdjustmentParameters()
+            appliedAdjustmentParameters.value = unref(activeAdjustmentParameters)
+          },
+          onConfirm: async () => {
+            store.dispatch('hideModal')
+            await saveImageTask(false).perform()
+            store.changeSelectedProcessingTool(newTool)
+            store.resetAdjustmentParameters()
+            appliedAdjustmentParameters.value = unref(activeAdjustmentParameters)
+          }
+        }
+        store.dispatch('createModal', modal)
+      } else {
+        store.changeSelectedProcessingTool(newTool)
+      }
+    }
+
+    function handleFullScreenChangeEvent() {
+      if (document.fullscreenElement === null) {
+        isFullScreenModeActivated.value = false
+      }
+    }
+
+    function loadMedium() {
+      isFileContentLoading.value = true
+
+      // Don't bother loading if file is already loaded and cached
+      if (unref(activeMediaFileCached)) {
+        setTimeout(
+          () => {
+            isFileContentLoading.value = false
+          },
+          // Delay to animate
+          50
+        )
+        return
+      }
+
+      this.loadActiveFileIntoCache()
+    }
+
+    // async function loadActiveFileIntoCache() {
+    //   try {
+    //     const loadRawFile = !unref(isActiveFileTypeImage)
+    //     let mediaUrl
+    //     if (loadRawFile) {
+    //       mediaUrl = await props.getUrlForResource(
+    //         unref(unref(props.currentFileContext).space),
+    //         unref(activeFilteredFile)
+    //       )
+    //     } else {
+    //       mediaUrl = await loadPreview(unref(activeFilteredFile))
+    //     }
+    //     addPreviewToCache(unref(activeFilteredFile), mediaUrl)
+    //     isFileContentLoading.value = false
+    //     isFileContentError.value = false
+    //   } catch (e) {
+    //     isFileContentLoading.value = false
+    //     isFileContentError.value = true
+    //     console.error(e)
+    //   }
+    // }
+
+    function addPreviewToCache(file: Resource, url) {
+      cachedFiles.value.push({
+        id: file.id as string,
+        name: file.name,
+        url: Number(file.size) < 4096 * 8192 ? url : '',
+        ext: file.extension,
+        mimeType: file.mimeType,
+        isVideo: isFileTypeVideo(file),
+        isImage: isFileTypeImage(file),
+        isAudio: isFileTypeAudio(file)
+      })
+    }
+
+    // function preloadImages() {
+    //   const loadPreviewAsync = (file: Resource) => {
+    //     toPreloadImageIds.value.push(file.id)
+    //     loadPreview(file)
+    //       .then((mediaUrl) => {
+    //         addPreviewToCache(file, mediaUrl)
+    //       })
+    //       .catch((e) => {
+    //         console.error(e)
+    //         toPreloadImageIds.value = unref(toPreloadImageIds).filter(
+    //           (fileId) => fileId !== file.id
+    //         )
+    //       })
+    //   }
+    // }
+
+    function mountActiveFile(driveAliasAndItem: string) {
+      for (let i = 0; i < unref(filteredFiles).length; i++) {
+        if (
+          unref(unref(props.currentFileContext).space)?.getDriveAliasAndItem(
+            unref(filteredFiles)[i]
+          ) === driveAliasAndItem
+        ) {
+          activeIndex.value = i
+          return
+        }
+      }
+
+      isFileContentLoading.value = false
+      isFileContentError.value = true
+    }
+
+    function handleLocalHistoryEvent() {
+      const result = router.resolve(document.location as unknown as RouteLocationRaw)
+      mountActiveFile(queryItemAsString(result.params.driveAliasAndItem))
+    }
+
+    const saveImageTask = () => console.log('save image task')
+    // const saveImageTask = (duplicate: boolean) =>
+    //   useTask(function* () {
+    //     const newVersion = yield getUpdatedBlob()
+
+    //     if (duplicate) {
+    //       try {
+    //         const nameGenerator = getNewEditedFileName()
+    //         let newName: string = nameGenerator.next().value as string
+
+    //         while (unref(filteredFiles).find((file) => file.name === newName)) {
+    //           newName = nameGenerator.next().value as string
+    //         }
+
+    //         const currentFolder = (
+    //           unref(unref(currentFileContext).routeParams).driveAliasAndItem as string
+    //         )
+    //           .split('/')
+    //           .slice(2)
+    //           .toString()
+    //           .replaceAll(',', '/')
+
+    //         const newPath = `${currentFolder}/${newName}`
+
+    //         const putFileContentsResponse = yield putFileContents(currentFileContext, {
+    //           content: newVersion,
+    //           path: newPath
+    //         })
+
+    //         const { params, query } = createFileRouteOptions(
+    //           unref(unref(currentFileContext).space),
+    //           putFileContentsResponse
+    //         )
+
+    //         const newUrl = router.resolve({
+    //           ...unref(route),
+    //           params: { ...unref(route).params, ...params },
+    //           query: { ...unref(route).query, ...query }
+    //         })
+
+    //         window.open(newUrl.fullPath, '_blank')?.focus()
+
+    //         imageSavedPopup()
+    //         handleResetAfterSave()
+    //       } catch (e) {
+    //         switch (e.statusCode) {
+    //           case 412:
+    //             errorPopup(
+    //               $gettext(
+    //                 'This file was updated outside this window. Please refresh the page (all changes will be lost).'
+    //               )
+    //             )
+    //             break
+    //           case 500:
+    //             errorPopup($gettext('Error when contacting the server'))
+    //             break
+    //           case 507:
+    //             const space = store.getters['runtime/spaces/spaces'].find(
+    //               (space) => space.id === unref(resource).storageId && isProjectSpaceResource(space)
+    //             )
+    //             if (space) {
+    //               errorPopup(
+    //                 $gettextInterpolate(
+    //                   $gettext('There is not enough quota on "%{spaceName}" to save this file'),
+    //                   { spaceName: space.name }
+    //                 )
+    //               )
+    //               break
+    //             }
+    //             errorPopup($gettext('There is not enough quota to save this file'))
+    //             break
+    //           case 401:
+    //             errorPopup($gettext("You're not authorized to save this file"))
+    //             break
+    //           default:
+    //             errorPopup(e.message || e)
+    //         }
+    //       }
+    //     } else {
+    //       try {
+    //         const putFileContentsResponse = yield putFileContents(currentFileContext, {
+    //           content: newVersion,
+    //           previousEntityTag: unref(currentETag)
+    //         })
+    //         const mediaUrl = yield getMediaFileUrl(putFileContentsResponse)
+    //         removeActivePreviewFromCache()
+    //         addPreviewToCache(unref(activeFilteredFile), mediaUrl)
+
+    //         const newActiveIndex = unref(filteredFiles).findIndex(
+    //           (file) => file.id === putFileContentsResponse.id
+    //         )
+    //         handleSetNewActiveIndex(newActiveIndex)
+    //         updateLocalHistory()
+
+    //         serverVersion.value = newVersion
+    //         currentETag.value = putFileContentsResponse.etag
+    //         imageSavedPopup()
+    //         handleResetAfterSave()
+    //       } catch (e) {
+    //         switch (e.statusCode) {
+    //           case 412:
+    //             errorPopup(
+    //               $gettext(
+    //                 'This file was updated outside this window. Please refresh the page (all changes will be lost).'
+    //               )
+    //             )
+    //             break
+    //           case 500:
+    //             errorPopup($gettext('Error when contacting the server'))
+    //             break
+    //           case 507:
+    //             const space = store.getters['runtime/spaces/spaces'].find(
+    //               (space) => space.id === unref(resource).storageId && isProjectSpaceResource(space)
+    //             )
+    //             if (space) {
+    //               errorPopup(
+    //                 $gettextInterpolate(
+    //                   $gettext('There is not enough quota on "%{spaceName}" to save this file'),
+    //                   { spaceName: space.name }
+    //                 )
+    //               )
+    //               break
+    //             }
+    //             errorPopup($gettext('There is not enough quota to save this file'))
+    //             break
+    //           case 401:
+    //             errorPopup($gettext("You're not authorized to save this file"))
+    //             break
+    //           default:
+    //             errorPopup(e.message || e)
+    //         }
+    //       }
+    //     }
+    //   }).restartable()
+
+    function removeActivePreviewFromCache() {
+      cachedFiles.value = unref(cachedFiles).filter(
+        (file) => file.id !== unref(activeMediaFileCached).id
+      )
+    }
+
+    function save(modalFunctions?: Array<(...args: any[]) => Promise<any> | any>) {
+      const modal = {
+        id: 'saveChangesModal',
+        variation: 'danger',
+        icon: 'warning',
+        title: $gettext('Save as'),
+        message: $gettext('Do you want to save the changes?'),
+        cancelText: $gettext('Cancel'),
+        buttonSecondaryText: $gettext('Save'),
+        confirmText: $gettext('Duplicate'),
+        onCancel: () => {
+          removeModal('saveModal')
+        },
+        onConfirmSecondary: async () => {
+          removeModal('saveModal')
+          await saveImageTask(false).perform()
+          modalFunctions && modalFunctions.forEach(async (func) => await func())
+        },
+        onConfirm: async () => {
+          removeModal('saveModal')
+          await saveImageTask(true).perform()
+        }
+      }
+      dispatchModal(modal)
+    }
+
+    function handleResetAfterSave() {
+      switch (processingTool.value) {
+        case ProcessingToolsEnum.Crop:
+          store.resetSelectedProcessingTool()
+          currentImageRotation.value = 0
+          break
+        case ProcessingToolsEnum.Customize:
+          store.resetSelectedProcessingTool()
+          store.resetAdjustmentParameters()
+          appliedAdjustmentParameters.value = unref(activeAdjustmentParameters)
+          currentImageRotation.value = 0
+          break
+        default:
+          store.resetAdjustmentParameters()
+          appliedAdjustmentParameters.value = unref(activeAdjustmentParameters)
+          currentImageRotation.value = 0
+      }
+    }
+
+    ///////////////////////
+
     watch(
       props.currentFileContext,
       async () => {
@@ -281,10 +912,45 @@ export default defineComponent({
       onPanZoomChanged,
       preloadImageCount,
       preview,
-      loading
+      loading,
+      activeAdjustmentParameters,
+      appliedAdjustmentParameters,
+      fileActions,
+      isActiveFileTypeAudio,
+      isActiveFileTypeImage,
+      isActiveFileTypeVideo,
+      isEditModeActivated,
+      isSaveable,
+      sortBy,
+      sortDir,
+      closePreview,
+      handleChangeProcessingTool,
+      handleFullScreenChangeEvent,
+      handleLocalHistoryEvent,
+      handleSetActiveMediaFile,
+      isFileTypeAudio,
+      isFileTypeImage,
+      isFileTypeVideo,
+      loadMedium,
+      //loadPreview,
+      mountActiveFile,
+      //preloadImages,
+      save,
+      saveImageTask,
+      toggleEditMode,
+      triggerActiveFileDownload
     }
   },
+
   computed: {
+    //...mapGetters('Preview', ['allParameters']),
+    pageTitle() {
+      // return this.$gettext('Preview for %{currentMediumName}', {
+      //   currentMediumName: this.activeFilteredFile?.name
+      // })
+      return 'Preview'
+    },
+
     thumbDimensions() {
       switch (true) {
         case window.innerWidth <= 1024:
@@ -326,10 +992,13 @@ export default defineComponent({
     }
   },
 
-  mounted() {
-    // keep a local history for this component
+  async mounted() {
+    await this.loadFolderForFileContext(this.currentFileContext)
     window.addEventListener('popstate', this.handleLocalHistoryEvent)
     document.addEventListener('fullscreenchange', this.handleFullScreenChangeEvent)
+    this.mountActiveFile(unref(this.currentFileContext.driveAliasAndItem))
+    this.appliedAdjustmentParameters = this.activeAdjustmentParameters
+    ;(this.$refs.preview as HTMLElement).focus()
   },
 
   beforeUnmount() {
@@ -367,6 +1036,7 @@ export default defineComponent({
       }
     },
     loadMedium() {
+      console.log('activeMediaFileCached', this.activeMediaFileCached)
       if (this.activeMediaFileCached) {
         return
       }
@@ -524,5 +1194,9 @@ export default defineComponent({
     height: auto;
     margin: 10px auto;
   }
+}
+.preview-body {
+  display: flex;
+  justify-content: space-between;
 }
 </style>

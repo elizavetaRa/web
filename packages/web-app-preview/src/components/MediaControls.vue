@@ -80,7 +80,7 @@
             <oc-icon fill-type="line" name="zoom-in" variation="inherit" />
           </oc-button>
         </div>
-        <div class="oc-ml-m">
+        <!-- <div class="oc-ml-m">
           <oc-button
             v-oc-tooltip="imageRotateLeftDescription"
             class="preview-controls-rotate-left"
@@ -113,7 +113,23 @@
           >
             <oc-icon fill-type="line" name="refresh" variation="inherit" />
           </oc-button>
-        </div>
+        </div> -->
+      </div>
+      <div v-if="isImage" class="oc-flex">
+        <oc-button
+          v-oc-tooltip="isEditModeActivated ? viewModeDescription : editModeDescription"
+          class="preview-controls-fullscreen"
+          appearance="raw-inverse"
+          variation="brand"
+          :aria-label="isEditModeActivated ? viewModeDescription : editModeDescription"
+          @click="$emit('toggleEditMode')"
+        >
+          <oc-icon
+            fill-type="line"
+            :name="isEditModeActivated ? 'eye' : 'edit-2'"
+            variation="inherit"
+          />
+        </oc-button>
       </div>
     </div>
   </div>
@@ -153,6 +169,10 @@ export default defineComponent({
     currentImageRotation: {
       type: Number,
       default: 0
+    },
+    isEditModeActivated: {
+      type: Boolean,
+      default: false
     }
   },
   emits: [
@@ -161,7 +181,8 @@ export default defineComponent({
     'toggleFullScreen',
     'toggleNext',
     'togglePrevious',
-    'resetImage'
+    'resetImage',
+    'toggleEditMode'
   ],
   setup(props, { emit }) {
     const { $gettext } = useGettext()
@@ -214,6 +235,7 @@ export default defineComponent({
       imageRotateRightDescription: $gettext('Rotate the image 90 degrees to the right'),
       previousDescription: $gettext('Show previous media file in folder'),
       nextDescription: $gettext('Show next media file in folder'),
+      editModeDescription: $gettext('Enter Edit mode'),
       imageShrink,
       imageZoom,
       imageRotateLeft,

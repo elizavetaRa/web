@@ -21,7 +21,7 @@ App framework:
 
 Composables:
 
-- `useStore` has been removed. Use the pinia for the store you want to use instead.
+- `useAppsStore` has been removed. Use the pinia for the store you want to use instead.
 - `useAccessToken` has been removed. It now sits inside the auth store.
 - `usePublicLinkContext` has been removed. It now sits inside the auth store.
 - `usePublicLinkPassword` has been removed. It now sits inside the auth store.
